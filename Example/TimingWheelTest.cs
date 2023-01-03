@@ -52,7 +52,7 @@ public class TimingWheelTest : MonoBehaviour
         // 添加毫秒级事件(每20ms执行)
         // tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime, StaticTask, tm.TickSpan, -1));
         // 添加秒级事件(每秒执行)
-        tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime, StaticTask, tm.WheelSpan, 2));
+        tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime, StaticTask, tm.WheelSpan, -1));
         // 添加分钟级事件(每分钟某个时间执行)
         // tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime, StaticTask, mtm.WheelSpan, -1));
         // 添加小时级事件(每小时某个时间执行)

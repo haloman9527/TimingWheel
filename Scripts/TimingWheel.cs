@@ -58,7 +58,6 @@ namespace CZToolKit.TimingWheel
             public LinkedList<TimeTask> tasks = new LinkedList<TimeTask>();
         }
 
-        [Serializable]
         public class ObjectPool<T> : IDisposable where T : class
         {
             public const int DEFAULT_SIZE = 32;
@@ -299,7 +298,7 @@ namespace CZToolKit.TimingWheel
                     AddTask(task);
                 }
             }
-            else if (task.NextTime - currentTime < wheelSpan)
+            else if (currentTime + wheelSpan > task.NextTime)
             {
                 var step = task.NextTime - currentTime;
                 var index = (step / tickSpan + step % tickSpan == 0 ? 0 : 1 + currentIndicator) % slotCount;
