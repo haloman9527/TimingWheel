@@ -35,10 +35,10 @@ namespace CZToolKit.TimingWheel
             public int LoopTime { get; set; }
 
             public Action Task { get; set; }
-            
+
             public Slot Slot { get; set; }
 
-            public TimeTask(long nextTime, Action task, long loopInterval, int loopTime = 0)
+            public TimeTask(long nextTime, Action task, long loopInterval, int loopTime)
             {
                 NextTime = nextTime;
                 LoopInterval = loopInterval;
@@ -91,7 +91,7 @@ namespace CZToolKit.TimingWheel
             /// <summary> 生成 </summary>
             public T Spawn()
             {
-                T unit = null;
+                T unit;
                 if (idleQueue.Count == 0)
                     unit = createFunction();
                 else
@@ -131,22 +131,22 @@ namespace CZToolKit.TimingWheel
         private int slotCount;
 
         /// <summary> 时间刻度 </summary>
-        private long tickSpan = 0;
+        private long tickSpan;
 
         /// <summary> 时间轮转动一圈的时间 </summary>
-        private long wheelSpan = 0;
+        private long wheelSpan;
 
         /// <summary> 当前时间轮的开始时间 </summary>
-        private long startTime = 0;
+        private long startTime;
 
         /// <summary> 当前指针时间 </summary>
-        private long currentTime = 0;
+        private long currentTime;
 
         /// <summary> 当前时间戳 </summary>
-        private long currentTimeStamp = 0;
+        private long currentTimeStamp;
 
         /// <summary> 当前指针下标 </summary>
-        private int currentIndicator = 0;
+        private int currentIndicator;
 
         /// <summary> 父轮(刻度更大的时间轮) </summary>
         private TimingWheel parentWheel;
@@ -162,7 +162,7 @@ namespace CZToolKit.TimingWheel
         {
             get { return currentTime; }
         }
-        
+
         /// <summary> 当前时间戳 </summary>
         public long CurrentTimeStamp
         {
@@ -188,10 +188,10 @@ namespace CZToolKit.TimingWheel
         }
 
         /// <summary>  </summary>
-        /// <param name="tickSpan"> 时间刻度 </param>
         /// <param name="slotCount"> 插槽数量 </param>
+        /// <param name="tickSpan"> 时间刻度 </param>
         /// <param name="startTime"> 开始时间 </param>
-        public TimingWheel(long tickSpan, int slotCount, long startTime)
+        public TimingWheel(int slotCount, long tickSpan, long startTime)
         {
             this.tickSpan = tickSpan;
             this.slotCount = slotCount;
@@ -209,14 +209,14 @@ namespace CZToolKit.TimingWheel
         }
 
         /// <summary>  </summary>
-        /// <param name="slotCount"> 父轮插槽数量 </param>
+        /// <param name="parentSlotCount"> 父轮插槽数量 </param>
         /// <returns></returns>
-        public TimingWheel BuildParent(int slotCount)
+        public TimingWheel BuildParent(int parentSlotCount)
         {
             if (parentWheel != null)
                 return parentWheel;
 
-            parentWheel = new TimingWheel(wheelSpan, slotCount, startTime);
+            parentWheel = new TimingWheel(parentSlotCount, wheelSpan, startTime);
             parentWheel.childWheel = this;
             return parentWheel;
         }
@@ -268,6 +268,7 @@ namespace CZToolKit.TimingWheel
                             task.Task?.Invoke();
                             task.Slot = null;
                         }
+
                         if (task.LoopTime < 0 || --task.LoopTime > 0)
                         {
                             task.NextTime += task.LoopInterval;

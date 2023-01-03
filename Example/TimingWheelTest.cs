@@ -28,7 +28,7 @@ public class TimingWheelTest : MonoBehaviour
     void Start()
     {
         // 秒轮(基础轮),刻度为20ms,一圈时间为1s
-        tm = new TimingWheel(200000, 50, DateTime.Now.ToFileTime());
+        tm = new TimingWheel(50, 200000, DateTime.Now.ToFileTime());
         // 分轮
         mtm = tm.BuildParent(60);
         // 时轮
