@@ -43,26 +43,26 @@ public class TimingWheelTest : MonoBehaviour
 
     void FixedUpdate()
     {
-        tm.Step(DateTime.Now.ToFileTime());
+        tm.Tick();
     }
 
     [Button]
     public void B()
     {
         // 添加毫秒级事件(每20ms执行)
-        // tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime + tm.TickSpan, StaticTask, tm.TickSpan, -1));
+        // tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime, StaticTask, tm.TickSpan, -1));
         // 添加秒级事件(每秒执行)
-        tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime, StaticTask, tm.WheelSpan, -1));
+        tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime, StaticTask, tm.WheelSpan, 2));
         // 添加分钟级事件(每分钟某个时间执行)
-        tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime + mtm.WheelSpan, StaticTask, mtm.WheelSpan, -1));
+        // tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime, StaticTask, mtm.WheelSpan, -1));
         // 添加小时级事件(每小时某个时间执行)
-        tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime + htm.WheelSpan, StaticTask, htm.WheelSpan, -1));
+        // tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime, StaticTask, htm.WheelSpan, -1));
         // 添加天级事件(每天某个时间执行)
-        tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime + dtm.WheelSpan, StaticTask, dtm.WheelSpan, -1));
+        // tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime, StaticTask, dtm.WheelSpan, -1));
         // 添加月级事件(每月某个时间执行)
-        // tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime + tm.WheelSpan, MonthTask));
+        // tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime, MonthTask));
         // 添加年级事件(每年某个时间执行)
-        // tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime + tm.WheelSpan, YearTask));
+        // tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime, YearTask));
     }
 
     private void StaticTask()

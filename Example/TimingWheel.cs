@@ -35,6 +35,8 @@ namespace CZToolKit.TimingWheel
             public int LoopTime { get; set; }
 
             public Action Task { get; set; }
+            
+            public Slot Slot { get; set; }
 
             public TimeTask(long nextTime, Action task, long loopInterval, int loopTime = 0)
             {
@@ -161,6 +163,12 @@ namespace CZToolKit.TimingWheel
         {
             get { return currentTime; }
         }
+        
+        /// <summary> 当前时间戳 </summary>
+        public long CurrentTimeStamp
+        {
+            get { return currentTimeStamp; }
+        }
 
         /// <summary> 插槽数量 </summary>
         public int SlotCount
@@ -256,7 +264,11 @@ namespace CZToolKit.TimingWheel
                     }
                     else
                     {
-                        task.Task?.Invoke();
+                        if (currentTime - task.NextTime < tickSpan)
+                        {
+                            task.Task?.Invoke();
+                            task.Slot = null;
+                        }
                         if (task.LoopTime < 0 || --task.LoopTime > 0)
                         {
                             task.NextTime += task.LoopInterval;
@@ -278,7 +290,9 @@ namespace CZToolKit.TimingWheel
         {
             if (task.NextTime == currentTime)
             {
+                task.Slot = slots[currentIndicator];
                 task.Task?.Invoke();
+                task.Slot = null;
                 if (task.LoopTime < 0 || --task.LoopTime > 0)
                 {
                     task.NextTime += task.LoopInterval;
@@ -291,11 +305,19 @@ namespace CZToolKit.TimingWheel
                 var index = (step / tickSpan + step % tickSpan == 0 ? 0 : 1 + currentIndicator) % slotCount;
                 var slot = slots[index];
                 var taskNode = taskLinkListNodePool.Spawn();
+                task.Slot = slot;
                 taskNode.Value = task;
                 slot.tasks.AddLast(taskNode);
             }
             else if (parentWheel != null)
                 parentWheel.AddTask(task);
+        }
+
+        public void RemoveTask(TimeTask task)
+        {
+            if (task.Slot == null)
+                return;
+            task.Slot.tasks.Remove(task);
         }
     }
 }
