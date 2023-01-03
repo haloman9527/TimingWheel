@@ -27,7 +27,7 @@ public class TimingWheelTest : MonoBehaviour
 
     void Start()
     {
-        // 秒轮(基础轮)
+        // 秒轮(基础轮),刻度为20ms,一圈时间为1s
         tm = new TimingWheel(200000, 50, DateTime.Now.ToFileTime());
         // 分轮
         mtm = tm.BuildParent(60);
@@ -49,11 +49,10 @@ public class TimingWheelTest : MonoBehaviour
     [Button]
     public void B()
     {
-        // 秒 分 时 天 比例固定
-        // 月 年 比例动态变化
-
+        // 添加毫秒级事件(每20ms执行)
+        // tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime + tm.TickSpan, StaticTask, tm.TickSpan, -1));
         // 添加秒级事件(每秒执行)
-        tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime + tm.WheelSpan, StaticTask, tm.WheelSpan, -1));
+        tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime, StaticTask, tm.WheelSpan, -1));
         // 添加分钟级事件(每分钟某个时间执行)
         tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime + mtm.WheelSpan, StaticTask, mtm.WheelSpan, -1));
         // 添加小时级事件(每小时某个时间执行)
@@ -61,9 +60,9 @@ public class TimingWheelTest : MonoBehaviour
         // 添加天级事件(每天某个时间执行)
         tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime + dtm.WheelSpan, StaticTask, dtm.WheelSpan, -1));
         // 添加月级事件(每月某个时间执行)
-        tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime + tm.WheelSpan, MonthTask));
+        // tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime + tm.WheelSpan, MonthTask));
         // 添加年级事件(每年某个时间执行)
-        tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime + tm.WheelSpan, YearTask));
+        // tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime + tm.WheelSpan, YearTask));
     }
 
     private void StaticTask()

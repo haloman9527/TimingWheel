@@ -276,14 +276,23 @@ namespace CZToolKit.TimingWheel
         /// <param name="task"></param>
         public void AddTask(TimeTask task)
         {
-            if (task.NextTime < currentTime + wheelSpan)
+            if (task.NextTime == currentTime)
+            {
+                task.Task?.Invoke();
+                if (task.LoopTime < 0 || --task.LoopTime > 0)
+                {
+                    task.NextTime += task.LoopInterval;
+                    AddTask(task);
+                }
+            }
+            else if (task.NextTime - currentTime < wheelSpan)
             {
                 var step = task.NextTime - currentTime;
                 var index = (step / tickSpan + step % tickSpan == 0 ? 0 : 1 + currentIndicator) % slotCount;
                 var slot = slots[index];
                 var taskNode = taskLinkListNodePool.Spawn();
                 taskNode.Value = task;
-                slots[index].tasks.AddLast(taskNode);
+                slot.tasks.AddLast(taskNode);
             }
             else if (parentWheel != null)
                 parentWheel.AddTask(task);
