@@ -43,7 +43,7 @@ public class TimingWheelTest : MonoBehaviour
 
     void FixedUpdate()
     {
-        tm.Tick();
+        tm.Tick(tm.TickSpan);
     }
 
     [Button]
@@ -62,7 +62,7 @@ public class TimingWheelTest : MonoBehaviour
         // 添加月级事件(每月某个时间执行)
         // tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime, MonthTask));
         // 添加年级事件(每年某个时间执行)
-        // tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime, YearTask));
+        tm.AddTask(new TimingWheel.TimeTask(tm.CurrentTime, YearTask));
     }
 
     private void StaticTask()
