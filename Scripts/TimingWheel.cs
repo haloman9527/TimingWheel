@@ -148,6 +148,9 @@ namespace CZToolKit.TimingWheel
         /// <summary> 当前指针下标 </summary>
         private int currentIndicator;
 
+        /// <summary> 正在执行事件 </summary>
+        private bool executingTask;
+
         /// <summary> 父轮(刻度更大的时间轮) </summary>
         private TimingWheel parentWheel;
 
@@ -252,6 +255,7 @@ namespace CZToolKit.TimingWheel
                 }
 
                 var currentSlot = slots[currentIndicator];
+                executingTask = true;
                 var taskNode = currentSlot.tasks.First;
                 while (taskNode != null)
                 {
@@ -281,6 +285,8 @@ namespace CZToolKit.TimingWheel
                     currentSlot.tasks.Remove(tempTaskNode);
                     taskLinkListNodePool.Release(tempTaskNode);
                 }
+
+                executingTask = false;
             }
         }
 
@@ -290,13 +296,24 @@ namespace CZToolKit.TimingWheel
         {
             if (task.NextTime == currentTime)
             {
-                task.Slot = slots[currentIndicator];
-                task.Task?.Invoke();
-                task.Slot = null;
-                if (task.LoopTime < 0 || --task.LoopTime > 0)
+                var slot = slots[currentIndicator];
+                if (executingTask)
                 {
-                    task.NextTime += task.LoopInterval;
-                    AddTask(task);
+                    var taskNode = taskLinkListNodePool.Spawn();
+                    task.Slot = slot;
+                    taskNode.Value = task;
+                    slot.tasks.AddLast(taskNode);
+                }
+                else
+                {
+                    task.Slot = slot;
+                    task.Task?.Invoke();
+                    task.Slot = null;
+                    if (task.LoopTime < 0 || --task.LoopTime > 0)
+                    {
+                        task.NextTime += task.LoopInterval;
+                        AddTask(task);
+                    }
                 }
             }
             else if (currentTime + wheelSpan > task.NextTime)
