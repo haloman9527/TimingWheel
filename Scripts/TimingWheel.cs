@@ -319,7 +319,7 @@ namespace CZToolKit.TimingWheel
             else if (currentTime + wheelSpan > task.NextTime)
             {
                 var step = task.NextTime - currentTime;
-                var index = ((step / tickSpan) + (step % tickSpan == 0 ? 0 : 1) + currentIndicator) % slotCount;
+                var index = (step / tickSpan + step % tickSpan == 0 ? 0 : 1 + currentIndicator) % slotCount;
                 var slot = slots[index];
                 var taskNode = taskLinkListNodePool.Spawn();
                 task.Slot = slot;
