@@ -53,7 +53,7 @@ namespace CZToolKit.TimingWheel
 
         public class LinkListNodePool : ObjectPool<LinkedListNode<ITimeTask>>
         {
-            protected override LinkedListNode<ITimeTask> Generate()
+            protected override LinkedListNode<ITimeTask> Create()
             {
                 return new LinkedListNode<ITimeTask>(default);
             }
