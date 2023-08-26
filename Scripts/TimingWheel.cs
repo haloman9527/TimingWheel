@@ -18,7 +18,7 @@
 
 using System;
 using System.Collections.Generic;
-using CZToolKit.Common.ObjectPool;
+using CZToolKit.ObjectPool;
 
 namespace CZToolKit.TimingWheel
 {
