@@ -260,7 +260,7 @@ namespace CZToolKit.TimingWheel
                     var tempTaskNode = taskNode;
                     taskNode = taskNode.Next;
                     currentSlot.tasks.Remove(tempTaskNode);
-                    taskLinkListNodePool.Recycle(tempTaskNode);
+                    taskLinkListNodePool.Release(tempTaskNode);
                 }
 
                 executingTask = false;
@@ -278,7 +278,7 @@ namespace CZToolKit.TimingWheel
                 var slot = slots[currentIndicator];
                 if (executingTask)
                 {
-                    var taskNode = taskLinkListNodePool.Spawn();
+                    var taskNode = taskLinkListNodePool.Acquire();
                     taskNode.Value = task;
                     slot.tasks.AddLast(taskNode);
                 }
@@ -297,7 +297,7 @@ namespace CZToolKit.TimingWheel
                 var step = task.NextTime - currentTime;
                 var index = ((step / tickSpan) + (step % tickSpan == 0 ? 0 : 1) + currentIndicator) % slotCount;
                 var slot = slots[index];
-                var taskNode = taskLinkListNodePool.Spawn();
+                var taskNode = taskLinkListNodePool.Acquire();
                 taskNode.Value = task;
                 slot.tasks.AddLast(taskNode);
             }
