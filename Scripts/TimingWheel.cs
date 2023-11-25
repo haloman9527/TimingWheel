@@ -18,7 +18,6 @@
 
 using System;
 using System.Collections.Generic;
-using CZToolKit.ObjectPool;
 
 namespace CZToolKit.TimingWheel
 {
@@ -51,7 +50,7 @@ namespace CZToolKit.TimingWheel
             public LinkedList<ITimeTask> tasks = new LinkedList<ITimeTask>();
         }
 
-        public class LinkListNodePool : ObjectPool<LinkedListNode<ITimeTask>>
+        public class LinkListNodePool : BaseObjectPool<LinkedListNode<ITimeTask>>
         {
             protected override LinkedListNode<ITimeTask> Create()
             {
