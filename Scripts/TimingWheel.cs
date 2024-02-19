@@ -23,6 +23,11 @@ namespace CZToolKit.TimingWheel
 {
     public class TimingWheel
     {
+        static TimingWheel()
+        {
+            ObjectPool.Instance.RegisterPool(typeof(LinkedListNode<ITimeTask>), new LinkListNodePool());
+        }
+        
         public interface ITimeTask
         {
             /// <summary>
@@ -114,11 +119,6 @@ namespace CZToolKit.TimingWheel
         private TimingWheel childWheel;
 
         /// <summary>
-        /// 链表节点对象池
-        /// </summary>
-        private LinkListNodePool taskLinkListNodePool;
-
-        /// <summary>
         /// 当前指针时间
         /// </summary>
         public long CurrentTime
@@ -177,8 +177,6 @@ namespace CZToolKit.TimingWheel
             {
                 slots[i] = new Slot();
             }
-
-            taskLinkListNodePool = new LinkListNodePool();
         }
 
         /// <summary>
@@ -259,7 +257,7 @@ namespace CZToolKit.TimingWheel
                     var tempTaskNode = taskNode;
                     taskNode = taskNode.Next;
                     currentSlot.tasks.Remove(tempTaskNode);
-                    taskLinkListNodePool.Recycle(tempTaskNode);
+                    ObjectPool.Instance.Recycle(tempTaskNode);
                 }
 
                 executingTask = false;
@@ -277,7 +275,7 @@ namespace CZToolKit.TimingWheel
                 var slot = slots[currentIndicator];
                 if (executingTask)
                 {
-                    var taskNode = taskLinkListNodePool.Spawn();
+                    var taskNode = ObjectPool.Instance.Spawn(typeof(LinkedListNode<ITimeTask>)) as LinkedListNode<ITimeTask>;
                     taskNode.Value = task;
                     slot.tasks.AddLast(taskNode);
                 }
@@ -296,7 +294,7 @@ namespace CZToolKit.TimingWheel
                 var step = task.NextTime - currentTime;
                 var index = ((step / tickSpan) + (step % tickSpan == 0 ? 0 : 1) + currentIndicator) % slotCount;
                 var slot = slots[index];
-                var taskNode = taskLinkListNodePool.Spawn();
+                var taskNode = ObjectPool.Instance.Spawn(typeof(LinkedListNode<ITimeTask>)) as LinkedListNode<ITimeTask>;
                 taskNode.Value = task;
                 slot.tasks.AddLast(taskNode);
             }
