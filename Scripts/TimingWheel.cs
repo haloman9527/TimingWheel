@@ -504,7 +504,6 @@ namespace CZToolKit.TimingWheel
 
         public void Dispose()
         {
-            // 清除所有任务
             ClearTasks();
         }
     }
