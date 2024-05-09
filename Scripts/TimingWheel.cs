@@ -25,24 +25,105 @@ namespace CZToolKit.TimingWheel
     {
         public interface ITimeTask
         {
-            // /// <summary>
-            // /// 下次执行的时间
-            // /// </summary>
-            // long NextTime { get; set; }
-            //
-            // /// <summary>
-            // /// 循环次数
-            // ///     -1: 无限
-            // ///    0|1: 不循环
-            // /// </summary>
-            // int LoopTime { get; set; }
-            //
-            // /// <summary>
-            // /// 循环间隔
-            // /// </summary>
-            // long LoopInterval { get; }
+            /// <summary>
+            /// 循环次数
+            ///     -1: 无限
+            ///    0|1: 不循环
+            /// </summary>
+            int LoopTime { get; set; }
 
-            void Invoke();
+            /// <summary>
+            /// 循环间隔
+            /// </summary>
+            long LoopInterval { get; set; }
+
+            void Invoke(TimingWheel timingWheel);
+        }
+
+        public class CustomTask : ITimeTask
+        {
+            public int LoopTime { get; set; }
+
+            public long LoopInterval { get; set; }
+
+            public Action task;
+
+            public void Invoke(TimingWheel timingWheel)
+            {
+                task?.Invoke();
+            }
+        }
+
+        public class DayTask : ITimeTask
+        {
+            public int LoopTime { get; set; }
+
+            public long LoopInterval
+            {
+                get => 86400000L;
+                set { }
+            }
+
+            public Action task;
+
+            public void Invoke(TimingWheel timingWheel)
+            {
+                task?.Invoke();
+            }
+        }
+
+        public class WeekTask : ITimeTask
+        {
+            public int LoopTime { get; set; }
+
+            public long LoopInterval
+            {
+                get => 604800000L;
+                set { }
+            }
+
+            public Action task;
+
+            public void Invoke(TimingWheel timingWheel)
+            {
+                task?.Invoke();
+            }
+        }
+
+        public class MonthTask : ITimeTask
+        {
+            public int LoopTime { get; set; }
+
+            public long LoopInterval
+            {
+                get => new DateTimeOffset(0, 1, 0, 0, 0, 0, TimeSpan.Zero).Millisecond;
+                set { }
+            }
+
+            public Action task;
+
+            public void Invoke(TimingWheel timingWheel)
+            {
+                task?.Invoke();
+            }
+        }
+
+        public class YearTask : ITimeTask
+        {
+            public int LoopTime { get; set; }
+
+            public long LoopInterval
+            {
+                get => new DateTimeOffset(1, 0, 0, 0, 0, 0, TimeSpan.Zero).Millisecond;
+                set { }
+            }
+
+            public Action task;
+
+            public void Invoke(TimingWheel timingWheel)
+            {
+                task?.Invoke();
+            }
         }
 
         public struct TimeTaskInfo
@@ -51,16 +132,6 @@ namespace CZToolKit.TimingWheel
             /// 任务下次执行时间
             /// </summary>
             public long nextTime;
-
-            /// <summary>
-            /// 任务剩余循环次数
-            /// </summary>
-            public int loopTime;
-
-            /// <summary>
-            /// 任务循环间隔
-            /// </summary>
-            public long loopInterval;
 
             /// <summary>
             /// 任务所在时间层
@@ -225,6 +296,124 @@ namespace CZToolKit.TimingWheel
             }
         }
 
+        private void Tick_Internal()
+        {
+            if (currentIndicator == 0)
+            {
+                outerWheel?.Tick_Internal();
+            }
+
+            currentTime += tickSpan;
+            currentIndicator = (currentIndicator + 1) % slots.Length;
+
+            if (currentIndicator == 0)
+            {
+                startTime += wheelSpan;
+            }
+
+            var currentSlot = slots[currentIndicator];
+            var taskCount = currentSlot.tasks.Count;
+            var taskNode = currentSlot.tasks.First;
+
+            while (taskNode != null && taskCount-- > 0)
+            {
+                var task = taskNode.Value;
+                var taskInfo = sharedInfo.taskInfos[task];
+
+                if (currentTime >= taskInfo.nextTime)
+                {
+                    if (innerWheel != null)
+                    {
+                        RemoveTask_Internal(task);
+                        innerWheel.AddTask_Internal(task, taskInfo.nextTime);
+                    }
+                    else
+                    {
+                        RemoveTask_Internal(task);
+
+                        try
+                        {
+                            task.Invoke(this);
+                        }
+                        catch (Exception e)
+                        {
+                            throw e;
+                        }
+
+                        if (task.LoopTime < 0 || --task.LoopTime > 0)
+                        {
+                            taskInfo.nextTime += task.LoopInterval;
+                            AddTask_Internal(task, taskInfo.nextTime);
+                        }
+                    }
+                }
+
+                taskNode = taskNode.Next;
+            }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="task"></param>
+        /// <param name="nextTime"> must be bigger than current time </param>
+        private void AddTask_Internal(ITimeTask task, long nextTime)
+        {
+            var delta = nextTime - currentTime;
+            if (delta <= 0)
+            {
+                try
+                {
+                    task.Invoke(this);
+                }
+                catch (Exception e)
+                {
+                    throw e;
+                }
+
+                if (task.LoopTime < 0 || --task.LoopTime > 0)
+                {
+                    nextTime += task.LoopInterval;
+                    AddTask_Internal(task, nextTime);
+                }
+            }
+            else if (delta <= wheelSpan)
+            {
+                if (delta < tickSpan && innerWheel != null)
+                {
+                    innerWheel.AddTask_Internal(task, nextTime);
+                }
+                else
+                {
+                    var offset = nextTime - startTime;
+                    var index = ((offset / tickSpan) + (offset % tickSpan > 0 ? 1 : 0)) % slotCount;
+                    var slot = slots[index];
+                    var taskNode = ObjectPools.Instance.Spawn<LinkedListNode<ITimeTask>>();
+                    taskNode.Value = task;
+                    slot.tasks.AddLast(taskNode);
+
+                    var taskInfo = new TimeTaskInfo();
+                    taskInfo.nextTime = nextTime;
+                    taskInfo.wheel = this;
+                    taskInfo.slot = slot;
+                    taskInfo.linkListNode = taskNode;
+                    sharedInfo.taskInfos[task] = taskInfo;
+                }
+            }
+            else if (delta > wheelSpan)
+            {
+                outerWheel?.AddTask_Internal(task, nextTime);
+            }
+        }
+
+        private void RemoveTask_Internal(ITimeTask task)
+        {
+            var taskInfo = sharedInfo.taskInfos[task];
+            sharedInfo.taskInfos.Remove(task);
+            taskInfo.slot.tasks.Remove(taskInfo.linkListNode);
+            ObjectPools.Instance.Recycle(taskInfo.linkListNode);
+        }
+
         /// <summary>
         /// 
         /// </summary>
@@ -273,149 +462,12 @@ namespace CZToolKit.TimingWheel
             return sharedInfo.taskInfos.ContainsKey(task);
         }
 
-        private void Tick_Internal()
-        {
-            if (currentIndicator == 0)
-            {
-                outerWheel?.Tick_Internal();
-            }
-            
-            currentTime += tickSpan;
-            currentIndicator = (currentIndicator + 1) % slots.Length;
-            
-            if (currentIndicator == 0)
-            {
-                startTime += wheelSpan;
-            }
-
-            var currentSlot = slots[currentIndicator];
-            var taskCount = currentSlot.tasks.Count;
-            var taskNode = currentSlot.tasks.First;
-
-            while (taskNode != null && taskCount-- > 0)
-            {
-                var task = taskNode.Value;
-                var taskInfo = sharedInfo.taskInfos[task];
-
-                if (currentTime >= taskInfo.nextTime)
-                {
-                    if (innerWheel != null)
-                    {
-                        RemoveTask_Internal(task);
-                        innerWheel.AddTask_Internal(task, taskInfo.nextTime, taskInfo.loopTime, taskInfo.loopInterval);
-                    }
-                    else
-                    {
-                        try
-                        {
-                            task.Invoke();
-                        }
-                        catch (Exception e)
-                        {
-                            throw e;
-                        }
-
-                        PostTaskInvoke_Internal(task);
-                    }
-                }
-
-                taskNode = taskNode.Next;
-            }
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="task"></param>
-        /// <param name="nextTime"> must be bigger than current time </param>
-        /// <param name="loopTime"></param>
-        /// <param name="loopInterval"></param>
-        private void AddTask_Internal(ITimeTask task, long nextTime, int loopTime, long loopInterval)
-        {
-            var delta = nextTime - currentTime;
-            if (delta <= 0)
-            {
-                try
-                {
-                    task.Invoke();
-                }
-                catch (Exception e)
-                {
-                    throw e;
-                }
-
-                if (loopTime < 0 || --loopTime > 0)
-                {
-                    nextTime += loopInterval;
-                    AddTask_Internal(task, nextTime, loopTime, loopInterval);
-                }
-            }
-            else if (delta <= wheelSpan)
-            {
-                if (delta < tickSpan && innerWheel != null)
-                {
-                    innerWheel.AddTask_Internal(task, nextTime, loopTime, loopInterval);
-                }
-                else
-                {
-                    var offset = nextTime - startTime;
-                    var index = ((offset / tickSpan) + (offset % tickSpan > 0 ? 1 : 0)) % slotCount;
-                    var slot = slots[index];
-                    var taskNode = ObjectPools.Instance.Spawn<LinkedListNode<ITimeTask>>();
-                    taskNode.Value = task;
-                    slot.tasks.AddLast(taskNode);
-
-                    var taskInfo = new TimeTaskInfo();
-                    taskInfo.nextTime = nextTime;
-                    taskInfo.loopTime = loopTime;
-                    taskInfo.loopInterval = loopInterval;
-                    taskInfo.wheel = this;
-                    taskInfo.slot = slot;
-                    taskInfo.linkListNode = taskNode;
-                    sharedInfo.taskInfos[task] = taskInfo;
-                }
-            }
-            else if (delta > wheelSpan)
-            {
-                outerWheel?.AddTask_Internal(task, nextTime, loopTime, loopInterval);
-            }
-        }
-
-        private void RemoveTask_Internal(ITimeTask task)
-        {
-            var taskInfo = sharedInfo.taskInfos[task];
-            sharedInfo.taskInfos.Remove(task);
-            taskInfo.slot.tasks.Remove(taskInfo.linkListNode);
-            ObjectPools.Instance.Recycle(taskInfo.linkListNode);
-        }
-
-        private void PostTaskInvoke_Internal(ITimeTask task)
-        {
-            if (!sharedInfo.taskInfos.TryGetValue(task, out var taskInfo))
-            {
-                return;
-            }
-
-            if (taskInfo.loopTime < 0 || --taskInfo.loopTime > 0)
-            {
-                taskInfo.nextTime += taskInfo.loopInterval;
-                RemoveTask_Internal(task);
-                AddTask_Internal(task, taskInfo.nextTime, taskInfo.loopTime, taskInfo.loopInterval);
-            }
-            else
-            {
-                RemoveTask_Internal(task);
-            }
-        }
-
         /// <summary>
         /// 添加时间任务
         /// </summary>
         /// <param name="task"></param>
         /// <param name="startDelay"></param>
-        /// <param name="loopTime"></param>
-        /// <param name="loopInterval"> 最少一刻度 </param>
-        public void AddTask(ITimeTask task, long startDelay = 0, int loopTime = -1, long loopInterval = 0)
+        public void AddTask(ITimeTask task, long startDelay = 0)
         {
             if (sharedInfo.taskInfos.ContainsKey(task))
             {
@@ -423,12 +475,9 @@ namespace CZToolKit.TimingWheel
             }
 
             startDelay = Math.Max(startDelay, 0);
-            loopTime = Math.Max(loopTime, -1);
-            loopInterval = Math.Max(loopInterval, 0);
-            loopInterval = Math.Max(loopInterval, tickSpan);
             var nextInvokeTime = currentTime + startDelay;
 
-            AddTask_Internal(task, nextInvokeTime, loopTime, loopInterval);
+            AddTask_Internal(task, nextInvokeTime);
         }
 
         public void RemoveTask(ITimeTask task)
