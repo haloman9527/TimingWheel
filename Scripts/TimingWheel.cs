@@ -3,9 +3,9 @@
 /***
  *
  *  Title:
- *  
+ *
  *  Description:
- *  
+ *
  *  Date:
  *  Version:
  *  Writer: 半只龙虾人
@@ -21,28 +21,72 @@ using System.Collections.Generic;
 
 namespace CZToolKit.TimingWheel
 {
-    public class TimingWheel
+    public class TimingWheel : IDisposable
     {
         public interface ITimeTask
         {
+            // /// <summary>
+            // /// 下次执行的时间
+            // /// </summary>
+            // long NextTime { get; set; }
+            //
+            // /// <summary>
+            // /// 循环次数
+            // ///     -1: 无限
+            // ///    0|1: 不循环
+            // /// </summary>
+            // int LoopTime { get; set; }
+            //
+            // /// <summary>
+            // /// 循环间隔
+            // /// </summary>
+            // long LoopInterval { get; }
+
+            void Invoke();
+        }
+
+        public struct TimeTaskInfo
+        {
             /// <summary>
-            /// 下次执行的时间
+            /// 任务下次执行时间
             /// </summary>
-            long NextTime { get; set; }
+            public long nextTime;
 
             /// <summary>
-            /// 循环次数
-            ///     -1: 无限
-            ///    0|1: 不循环
+            /// 任务剩余循环次数
             /// </summary>
-            int LoopTime { get; set; }
+            public int loopTime;
 
             /// <summary>
-            /// 循环间隔
+            /// 任务循环间隔
             /// </summary>
-            long LoopInterval { get; }
+            public long loopInterval;
 
-            Action Task { get; }
+            /// <summary>
+            /// 任务所在时间层
+            /// </summary>
+            public TimingWheel wheel;
+
+            /// <summary>
+            /// 任务所在刻度
+            /// </summary>
+            public Slot slot;
+
+            /// <summary>
+            /// 任务所在的链表的位置
+            /// </summary>
+            public LinkedListNode<ITimeTask> linkListNode;
+        }
+
+        /// <summary>
+        /// 整个分层事件轮中共享的数据
+        /// </summary>
+        internal class TimingWheelSharedInfo
+        {
+            /// <summary>
+            /// 任务数据
+            /// </summary>
+            public Dictionary<ITimeTask, TimeTaskInfo> taskInfos = new Dictionary<ITimeTask, TimeTaskInfo>();
         }
 
         public class Slot
@@ -105,14 +149,19 @@ namespace CZToolKit.TimingWheel
         private bool executingTask;
 
         /// <summary>
-        /// 父轮(刻度更大的时间轮)
+        /// 整个分层事件轮共享数据
         /// </summary>
-        private TimingWheel parentWheel;
+        private TimingWheelSharedInfo sharedInfo;
 
         /// <summary>
-        /// 子轮(刻度更小的时间轮)
+        /// 外轮(刻度更大的时间轮)
         /// </summary>
-        private TimingWheel childWheel;
+        private TimingWheel outerWheel;
+
+        /// <summary>
+        /// 内轮(刻度更小的时间轮)
+        /// </summary>
+        private TimingWheel innerWheel;
 
         /// <summary>
         /// 当前指针时间
@@ -169,6 +218,7 @@ namespace CZToolKit.TimingWheel
             this.currentTimeStamp = startTime;
             this.currentTime = startTime;
             this.slots = new Slot[slotCount];
+            this.sharedInfo = new TimingWheelSharedInfo();
             for (int i = 0; i < slotCount; i++)
             {
                 slots[i] = new Slot();
@@ -182,12 +232,13 @@ namespace CZToolKit.TimingWheel
         /// <returns></returns>
         public TimingWheel BuildParent(int parentSlotCount)
         {
-            if (parentWheel != null)
-                return parentWheel;
+            if (outerWheel != null)
+                return outerWheel;
 
-            parentWheel = new TimingWheel(parentSlotCount, wheelSpan, startTime);
-            parentWheel.childWheel = this;
-            return parentWheel;
+            outerWheel = new TimingWheel(parentSlotCount, wheelSpan, startTime);
+            outerWheel.innerWheel = this;
+            outerWheel.sharedInfo = this.sharedInfo;
+            return outerWheel;
         }
 
         /// <summary>
@@ -195,68 +246,165 @@ namespace CZToolKit.TimingWheel
         /// </summary>
         public void Tick()
         {
-            Step(currentTimeStamp + tickSpan);
+            currentTimeStamp += tickSpan;
+            var delta = currentTimeStamp - currentTime;
+            while (delta > tickSpan)
+            {
+                Tick_Internal();
+                delta -= tickSpan;
+            }
         }
 
         /// <summary> 推进时间轮 </summary>
         /// <param name="tick"> 拨动指针，前进一段时间 </param>
         public void Tick(long tick)
         {
-            Step(currentTimeStamp + tick);
+            currentTimeStamp += tick;
+            var delta = currentTimeStamp - currentTime;
+            while (delta > tickSpan)
+            {
+                Tick_Internal();
+                delta -= tickSpan;
+            }
         }
 
-        /// <summary>
-        /// 推进时间轮
-        /// </summary>
-        /// <param name="timestamp"> 前进到该时间戳 </param>
-        public void Step(long timestamp)
+        public bool ContainsTask(ITimeTask task)
         {
-            if (timestamp <= currentTimeStamp)
-                return;
-            currentTimeStamp = timestamp;
-            while (currentTimeStamp - currentTime >= tickSpan)
+            return sharedInfo.taskInfos.ContainsKey(task);
+        }
+
+        private void Tick_Internal()
+        {
+            if (currentIndicator == 0)
             {
-                currentTime += tickSpan;
-                currentIndicator = (currentIndicator + 1) % slots.Length;
-                if (currentIndicator == 0)
+                outerWheel?.Tick_Internal();
+            }
+            
+            currentTime += tickSpan;
+            currentIndicator = (currentIndicator + 1) % slots.Length;
+            
+            if (currentIndicator == 0)
+            {
+                startTime += wheelSpan;
+            }
+
+            var currentSlot = slots[currentIndicator];
+            var taskCount = currentSlot.tasks.Count;
+            var taskNode = currentSlot.tasks.First;
+
+            while (taskNode != null && taskCount-- > 0)
+            {
+                var task = taskNode.Value;
+                var taskInfo = sharedInfo.taskInfos[task];
+
+                if (currentTime >= taskInfo.nextTime)
                 {
-                    parentWheel.Step(startTime + wheelSpan);
-                    startTime += wheelSpan;
-                }
-
-                var currentSlot = slots[currentIndicator];
-                var taskNode = currentSlot.tasks.First;
-
-                executingTask = true;
-                while (taskNode != null)
-                {
-                    var task = taskNode.Value;
-
-                    if (childWheel != null)
+                    if (innerWheel != null)
                     {
-                        childWheel.AddTask(task);
+                        RemoveTask_Internal(task);
+                        innerWheel.AddTask_Internal(task, taskInfo.nextTime, taskInfo.loopTime, taskInfo.loopInterval);
                     }
                     else
                     {
-                        if (currentTime - task.NextTime < tickSpan)
+                        try
                         {
-                            task.Task?.Invoke();
+                            task.Invoke();
+                        }
+                        catch (Exception e)
+                        {
+                            throw e;
                         }
 
-                        if (task.LoopTime < 0 || --task.LoopTime > 0)
-                        {
-                            task.NextTime += task.LoopInterval;
-                            AddTask(task);
-                        }
+                        PostTaskInvoke_Internal(task);
                     }
-
-                    var tempTaskNode = taskNode;
-                    taskNode = taskNode.Next;
-                    currentSlot.tasks.Remove(tempTaskNode);
-                    ObjectPools.Instance.Recycle(tempTaskNode);
                 }
 
-                executingTask = false;
+                taskNode = taskNode.Next;
+            }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="task"></param>
+        /// <param name="nextTime"> must be bigger than current time </param>
+        /// <param name="loopTime"></param>
+        /// <param name="loopInterval"></param>
+        private void AddTask_Internal(ITimeTask task, long nextTime, int loopTime, long loopInterval)
+        {
+            var delta = nextTime - currentTime;
+            if (delta <= 0)
+            {
+                try
+                {
+                    task.Invoke();
+                }
+                catch (Exception e)
+                {
+                    throw e;
+                }
+
+                if (loopTime < 0 || --loopTime > 0)
+                {
+                    nextTime += loopInterval;
+                    AddTask_Internal(task, nextTime, loopTime, loopInterval);
+                }
+            }
+            else if (delta <= wheelSpan)
+            {
+                if (delta < tickSpan && innerWheel != null)
+                {
+                    innerWheel.AddTask_Internal(task, nextTime, loopTime, loopInterval);
+                }
+                else
+                {
+                    var offset = nextTime - startTime;
+                    var index = ((offset / tickSpan) + (offset % tickSpan > 0 ? 1 : 0)) % slotCount;
+                    var slot = slots[index];
+                    var taskNode = ObjectPools.Instance.Spawn<LinkedListNode<ITimeTask>>();
+                    taskNode.Value = task;
+                    slot.tasks.AddLast(taskNode);
+
+                    var taskInfo = new TimeTaskInfo();
+                    taskInfo.nextTime = nextTime;
+                    taskInfo.loopTime = loopTime;
+                    taskInfo.loopInterval = loopInterval;
+                    taskInfo.wheel = this;
+                    taskInfo.slot = slot;
+                    taskInfo.linkListNode = taskNode;
+                    sharedInfo.taskInfos[task] = taskInfo;
+                }
+            }
+            else if (delta > wheelSpan)
+            {
+                outerWheel?.AddTask_Internal(task, nextTime, loopTime, loopInterval);
+            }
+        }
+
+        private void RemoveTask_Internal(ITimeTask task)
+        {
+            var taskInfo = sharedInfo.taskInfos[task];
+            sharedInfo.taskInfos.Remove(task);
+            taskInfo.slot.tasks.Remove(taskInfo.linkListNode);
+            ObjectPools.Instance.Recycle(taskInfo.linkListNode);
+        }
+
+        private void PostTaskInvoke_Internal(ITimeTask task)
+        {
+            if (!sharedInfo.taskInfos.TryGetValue(task, out var taskInfo))
+            {
+                return;
+            }
+
+            if (taskInfo.loopTime < 0 || --taskInfo.loopTime > 0)
+            {
+                taskInfo.nextTime += taskInfo.loopInterval;
+                RemoveTask_Internal(task);
+                AddTask_Internal(task, taskInfo.nextTime, taskInfo.loopTime, taskInfo.loopInterval);
+            }
+            else
+            {
+                RemoveTask_Internal(task);
             }
         }
 
@@ -264,38 +412,51 @@ namespace CZToolKit.TimingWheel
         /// 添加时间任务
         /// </summary>
         /// <param name="task"></param>
-        public void AddTask(ITimeTask task)
+        /// <param name="startDelay"></param>
+        /// <param name="loopTime"></param>
+        /// <param name="loopInterval"> 最少一刻度 </param>
+        public void AddTask(ITimeTask task, long startDelay = 0, int loopTime = -1, long loopInterval = 0)
         {
-            if (task.NextTime == currentTime)
+            if (sharedInfo.taskInfos.ContainsKey(task))
             {
-                var slot = slots[currentIndicator];
-                if (executingTask)
-                {
-                    var taskNode = ObjectPools.Instance.Spawn(typeof(LinkedListNode<ITimeTask>)) as LinkedListNode<ITimeTask>;
-                    taskNode.Value = task;
-                    slot.tasks.AddLast(taskNode);
-                }
-                else
-                {
-                    task.Task?.Invoke();
-                    if (task.LoopTime < 0 || --task.LoopTime > 0)
-                    {
-                        task.NextTime += task.LoopInterval;
-                        AddTask(task);
-                    }
-                }
+                return;
             }
-            else if (currentTime + wheelSpan > task.NextTime)
+
+            startDelay = Math.Max(startDelay, 0);
+            loopTime = Math.Max(loopTime, -1);
+            loopInterval = Math.Max(loopInterval, 0);
+            loopInterval = Math.Max(loopInterval, tickSpan);
+            var nextInvokeTime = currentTime + startDelay;
+
+            AddTask_Internal(task, nextInvokeTime, loopTime, loopInterval);
+        }
+
+        public void RemoveTask(ITimeTask task)
+        {
+            if (!sharedInfo.taskInfos.TryGetValue(task, out var taskInfo))
             {
-                var step = task.NextTime - currentTime;
-                var index = ((step / tickSpan) + (step % tickSpan == 0 ? 0 : 1) + currentIndicator) % slotCount;
-                var slot = slots[index];
-                var taskNode = ObjectPools.Instance.Spawn(typeof(LinkedListNode<ITimeTask>)) as LinkedListNode<ITimeTask>;
-                taskNode.Value = task;
-                slot.tasks.AddLast(taskNode);
+                return;
             }
-            else if (parentWheel != null)
-                parentWheel.AddTask(task);
+
+            RemoveTask_Internal(task);
+        }
+
+        public void ClearTasks()
+        {
+            foreach (var pair in sharedInfo.taskInfos)
+            {
+                var taskInfo = pair.Value;
+                taskInfo.slot.tasks.Remove(taskInfo.linkListNode);
+                ObjectPools.Instance.Recycle(taskInfo.linkListNode);
+            }
+
+            sharedInfo.taskInfos.Clear();
+        }
+
+        public void Dispose()
+        {
+            // 清除所有任务
+            ClearTasks();
         }
     }
 }
