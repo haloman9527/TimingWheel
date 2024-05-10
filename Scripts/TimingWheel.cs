@@ -19,7 +19,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace CZToolKit.TimingWheel
+namespace CZToolKit
 {
     public class TimingWheel : IDisposable
     {
