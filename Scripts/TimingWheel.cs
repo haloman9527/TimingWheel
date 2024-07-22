@@ -417,17 +417,27 @@ namespace CZToolKit
         /// <summary>
         /// 
         /// </summary>
-        /// <param name="parentSlotCount"> 父轮插槽数量 </param>
-        /// <returns></returns>
-        public TimingWheel BuildParent(int parentSlotCount)
+        /// <param name="parentSlotCounts"> 父轮插槽数量 </param>
+        public void BuildParent(params int[] parentSlotCounts)
         {
-            if (outerWheel != null)
-                return outerWheel;
+            if (parentSlotCounts == null)
+                return;
 
-            outerWheel = new TimingWheel(parentSlotCount, wheelSpan, startTime);
-            outerWheel.innerWheel = this;
-            outerWheel.sharedInfo = this.sharedInfo;
-            return outerWheel;
+            var wheel = this;
+            for (int i = 0; i < parentSlotCounts.Length; i++)
+            {
+                if (wheel.outerWheel != null)
+                {
+                    wheel = outerWheel;
+                }
+                else
+                {
+                    wheel.outerWheel = new TimingWheel(parentSlotCounts[i], wheelSpan, startTime);
+                    wheel.outerWheel.innerWheel = this;
+                    wheel.outerWheel.sharedInfo = this.sharedInfo;
+                    wheel = wheel.outerWheel;
+                }
+            }
         }
 
         /// <summary>
