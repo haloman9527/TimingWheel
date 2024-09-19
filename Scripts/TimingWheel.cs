@@ -388,7 +388,7 @@ namespace CZToolKit
                     var offset = nextTime - startTime;
                     var index = ((offset / tickSpan) + (offset % tickSpan > 0 ? 1 : 0)) % slotCount;
                     var slot = slots[index];
-                    var taskNode = ObjectPools.Instance.Spawn<LinkedListNode<ITimeTask>>();
+                    var taskNode = (LinkedListNode<ITimeTask>)ObjectPools.Instance.Spawn(typeof(LinkedListNode<ITimeTask>));
                     taskNode.Value = task;
                     slot.tasks.AddLast(taskNode);
 
