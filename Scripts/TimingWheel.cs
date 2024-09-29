@@ -388,7 +388,7 @@ namespace CZToolKit
                     var offset = nextTime - startTime;
                     var index = ((offset / tickSpan) + (offset % tickSpan > 0 ? 1 : 0)) % slotCount;
                     var slot = slots[index];
-                    var taskNode = (LinkedListNode<ITimeTask>)ObjectPools.Instance.Spawn(typeof(LinkedListNode<ITimeTask>));
+                    var taskNode = (LinkedListNode<ITimeTask>)ObjectPools.Spawn(typeof(LinkedListNode<ITimeTask>));
                     taskNode.Value = task;
                     slot.tasks.AddLast(taskNode);
 
@@ -411,7 +411,7 @@ namespace CZToolKit
             var taskInfo = sharedInfo.taskInfos[task];
             sharedInfo.taskInfos.Remove(task);
             taskInfo.slot.tasks.Remove(taskInfo.linkListNode);
-            ObjectPools.Instance.Recycle(taskInfo.linkListNode);
+            ObjectPools.Recycle(taskInfo.linkListNode);
         }
 
         /// <summary>
@@ -506,7 +506,7 @@ namespace CZToolKit
             {
                 var taskInfo = pair.Value;
                 taskInfo.slot.tasks.Remove(taskInfo.linkListNode);
-                ObjectPools.Instance.Recycle(taskInfo.linkListNode);
+                ObjectPools.Recycle(taskInfo.linkListNode);
             }
 
             sharedInfo.taskInfos.Clear();
