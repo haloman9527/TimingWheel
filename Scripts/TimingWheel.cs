@@ -18,8 +18,9 @@
 
 using System;
 using System.Collections.Generic;
+using CZToolKit;
 
-namespace CZToolKit
+namespace Jiange
 {
     public class TimingWheel : IDisposable
     {
