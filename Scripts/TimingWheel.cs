@@ -18,9 +18,9 @@
 
 using System;
 using System.Collections.Generic;
-using Jiange;
+using Moyo;
 
-namespace Jiange
+namespace Moyo
 {
     public class TimingWheel : IDisposable
     {
