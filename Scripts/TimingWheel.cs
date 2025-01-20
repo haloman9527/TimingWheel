@@ -167,7 +167,7 @@ namespace Moyo
         }
 
         [ObjectPool(typeof(LinkedListNode<ITimeTask>))]
-        public class LinkListNodePool : BaseObjectPool<LinkedListNode<ITimeTask>>
+        public class LinkListNodePool : ObjectPool<LinkedListNode<ITimeTask>>
         {
             protected override LinkedListNode<ITimeTask> Create()
             {
