@@ -389,7 +389,7 @@ namespace Moyo
                     var offset = nextTime - startTime;
                     var index = ((offset / tickSpan) + (offset % tickSpan > 0 ? 1 : 0)) % slotCount;
                     var slot = slots[index];
-                    var taskNode = (LinkedListNode<ITimeTask>)ObjectPools.Spawn(typeof(LinkedListNode<ITimeTask>));
+                    var taskNode = (LinkedListNode<ITimeTask>)ObjectPoolService.Spawn(typeof(LinkedListNode<ITimeTask>));
                     taskNode.Value = task;
                     slot.tasks.AddLast(taskNode);
 
@@ -412,7 +412,7 @@ namespace Moyo
             var taskInfo = sharedInfo.taskInfos[task];
             sharedInfo.taskInfos.Remove(task);
             taskInfo.slot.tasks.Remove(taskInfo.linkListNode);
-            ObjectPools.Recycle(taskInfo.linkListNode);
+            ObjectPoolService.Recycle(taskInfo.linkListNode);
         }
 
         /// <summary>
@@ -507,7 +507,7 @@ namespace Moyo
             {
                 var taskInfo = pair.Value;
                 taskInfo.slot.tasks.Remove(taskInfo.linkListNode);
-                ObjectPools.Recycle(taskInfo.linkListNode);
+                ObjectPoolService.Recycle(taskInfo.linkListNode);
             }
 
             sharedInfo.taskInfos.Clear();
