@@ -18,9 +18,9 @@
 
 using System;
 using System.Collections.Generic;
-using Moyo;
+using Atom;
 
-namespace Moyo
+namespace Atom
 {
     public class TimingWheel : IDisposable
     {
