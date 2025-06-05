@@ -22,159 +22,13 @@ using Atom;
 
 namespace Atom
 {
-    public class TimingWheel : IDisposable
+    public partial class TimingWheel : IDisposable
     {
-        public interface ITimeTask
+        static TimingWheel()
         {
-            /// <summary>
-            /// 循环次数
-            ///     -1: 无限
-            ///    0|1: 不循环
-            /// </summary>
-            int LoopTime { get; set; }
-
-            /// <summary>
-            /// 循环间隔
-            /// </summary>
-            long LoopInterval { get; set; }
-
-            void Invoke(TimingWheel timingWheel);
+            ObjectPoolManager.RegisterPool(new LinkListNodePool());
         }
-
-        public class CustomTask : ITimeTask
-        {
-            public int LoopTime { get; set; }
-
-            public long LoopInterval { get; set; }
-
-            public Action task;
-
-            public void Invoke(TimingWheel timingWheel)
-            {
-                task?.Invoke();
-            }
-        }
-
-        public class DayTask : ITimeTask
-        {
-            public int LoopTime { get; set; }
-
-            public long LoopInterval
-            {
-                get => 86400000L;
-                set { }
-            }
-
-            public Action task;
-
-            public void Invoke(TimingWheel timingWheel)
-            {
-                task?.Invoke();
-            }
-        }
-
-        public class WeekTask : ITimeTask
-        {
-            public int LoopTime { get; set; }
-
-            public long LoopInterval
-            {
-                get => 604800000L;
-                set { }
-            }
-
-            public Action task;
-
-            public void Invoke(TimingWheel timingWheel)
-            {
-                task?.Invoke();
-            }
-        }
-
-        public class MonthTask : ITimeTask
-        {
-            public int LoopTime { get; set; }
-
-            public long LoopInterval
-            {
-                get => new DateTimeOffset(0, 1, 0, 0, 0, 0, TimeSpan.Zero).Millisecond;
-                set { }
-            }
-
-            public Action task;
-
-            public void Invoke(TimingWheel timingWheel)
-            {
-                task?.Invoke();
-            }
-        }
-
-        public class YearTask : ITimeTask
-        {
-            public int LoopTime { get; set; }
-
-            public long LoopInterval
-            {
-                get => new DateTimeOffset(1, 0, 0, 0, 0, 0, TimeSpan.Zero).Millisecond;
-                set { }
-            }
-
-            public Action task;
-
-            public void Invoke(TimingWheel timingWheel)
-            {
-                task?.Invoke();
-            }
-        }
-
-        public struct TimeTaskInfo
-        {
-            /// <summary>
-            /// 任务下次执行时间
-            /// </summary>
-            public long nextTime;
-
-            /// <summary>
-            /// 任务所在时间层
-            /// </summary>
-            public TimingWheel wheel;
-
-            /// <summary>
-            /// 任务所在刻度
-            /// </summary>
-            public Slot slot;
-
-            /// <summary>
-            /// 任务所在的链表的位置
-            /// </summary>
-            public LinkedListNode<ITimeTask> linkListNode;
-        }
-
-        /// <summary>
-        /// 整个分层事件轮中共享的数据
-        /// </summary>
-        internal class TimingWheelSharedInfo
-        {
-            /// <summary>
-            /// 任务数据
-            /// </summary>
-            public Dictionary<ITimeTask, TimeTaskInfo> taskInfos = new Dictionary<ITimeTask, TimeTaskInfo>();
-        }
-
-        public class Slot
-        {
-            public LinkedList<ITimeTask> tasks = new LinkedList<ITimeTask>();
-        }
-
-        [ObjectPool(typeof(LinkedListNode<ITimeTask>))]
-        public class LinkListNodePool : ObjectPool<LinkedListNode<ITimeTask>>
-        {
-            protected override LinkedListNode<ITimeTask> Create()
-            {
-                return new LinkedListNode<ITimeTask>(default);
-            }
-        }
-
+        
         /// <summary>
         /// 插槽
         /// </summary>
@@ -389,7 +243,7 @@ namespace Atom
                     var offset = nextTime - startTime;
                     var index = ((offset / tickSpan) + (offset % tickSpan > 0 ? 1 : 0)) % slotCount;
                     var slot = slots[index];
-                    var taskNode = (LinkedListNode<ITimeTask>)ObjectPoolService.Spawn(typeof(LinkedListNode<ITimeTask>));
+                    var taskNode = (LinkedListNode<ITimeTask>)ObjectPoolManager.Spawn(typeof(LinkedListNode<ITimeTask>));
                     taskNode.Value = task;
                     slot.tasks.AddLast(taskNode);
 
@@ -412,7 +266,7 @@ namespace Atom
             var taskInfo = sharedInfo.taskInfos[task];
             sharedInfo.taskInfos.Remove(task);
             taskInfo.slot.tasks.Remove(taskInfo.linkListNode);
-            ObjectPoolService.Recycle(taskInfo.linkListNode);
+            ObjectPoolManager.Recycle(taskInfo.linkListNode);
         }
 
         /// <summary>
@@ -507,7 +361,7 @@ namespace Atom
             {
                 var taskInfo = pair.Value;
                 taskInfo.slot.tasks.Remove(taskInfo.linkListNode);
-                ObjectPoolService.Recycle(taskInfo.linkListNode);
+                ObjectPoolManager.Recycle(taskInfo.linkListNode);
             }
 
             sharedInfo.taskInfos.Clear();
@@ -516,6 +370,160 @@ namespace Atom
         public void Dispose()
         {
             ClearTasks();
+        }
+    }
+
+
+    public partial class TimingWheel
+    {
+        public interface ITimeTask
+        {
+            /// <summary>
+            /// 循环次数
+            ///     -1: 无限
+            ///    0|1: 不循环
+            /// </summary>
+            int LoopTime { get; set; }
+
+            /// <summary>
+            /// 循环间隔
+            /// </summary>
+            long LoopInterval { get; set; }
+
+            void Invoke(TimingWheel timingWheel);
+        }
+
+        public class CustomTask : ITimeTask
+        {
+            public int LoopTime { get; set; }
+
+            public long LoopInterval { get; set; }
+
+            public Action task;
+
+            public void Invoke(TimingWheel timingWheel)
+            {
+                task?.Invoke();
+            }
+        }
+
+        public class DayTask : ITimeTask
+        {
+            public int LoopTime { get; set; }
+
+            public long LoopInterval
+            {
+                get => 86400000L;
+                set { }
+            }
+
+            public Action task;
+
+            public void Invoke(TimingWheel timingWheel)
+            {
+                task?.Invoke();
+            }
+        }
+
+        public class WeekTask : ITimeTask
+        {
+            public int LoopTime { get; set; }
+
+            public long LoopInterval
+            {
+                get => 604800000L;
+                set { }
+            }
+
+            public Action task;
+
+            public void Invoke(TimingWheel timingWheel)
+            {
+                task?.Invoke();
+            }
+        }
+
+        public class MonthTask : ITimeTask
+        {
+            public int LoopTime { get; set; }
+
+            public long LoopInterval
+            {
+                get => new DateTimeOffset(0, 1, 0, 0, 0, 0, TimeSpan.Zero).Millisecond;
+                set { }
+            }
+
+            public Action task;
+
+            public void Invoke(TimingWheel timingWheel)
+            {
+                task?.Invoke();
+            }
+        }
+
+        public class YearTask : ITimeTask
+        {
+            public int LoopTime { get; set; }
+
+            public long LoopInterval
+            {
+                get => new DateTimeOffset(1, 0, 0, 0, 0, 0, TimeSpan.Zero).Millisecond;
+                set { }
+            }
+
+            public Action task;
+
+            public void Invoke(TimingWheel timingWheel)
+            {
+                task?.Invoke();
+            }
+        }
+
+        public struct TimeTaskInfo
+        {
+            /// <summary>
+            /// 任务下次执行时间
+            /// </summary>
+            public long nextTime;
+
+            /// <summary>
+            /// 任务所在时间层
+            /// </summary>
+            public TimingWheel wheel;
+
+            /// <summary>
+            /// 任务所在刻度
+            /// </summary>
+            public Slot slot;
+
+            /// <summary>
+            /// 任务所在的链表的位置
+            /// </summary>
+            public LinkedListNode<ITimeTask> linkListNode;
+        }
+
+        /// <summary>
+        /// 整个分层事件轮中共享的数据
+        /// </summary>
+        internal class TimingWheelSharedInfo
+        {
+            /// <summary>
+            /// 任务数据
+            /// </summary>
+            public Dictionary<ITimeTask, TimeTaskInfo> taskInfos = new Dictionary<ITimeTask, TimeTaskInfo>();
+        }
+
+        public class Slot
+        {
+            public LinkedList<ITimeTask> tasks = new LinkedList<ITimeTask>();
+        }
+
+        public class LinkListNodePool : ObjectPoolBase<LinkedListNode<ITimeTask>>
+        {
+            protected override LinkedListNode<ITimeTask> Create()
+            {
+                return new LinkedListNode<ITimeTask>(default);
+            }
         }
     }
 }
